@@ -1,6 +1,9 @@
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
+from datetime import timedelta
+from timeit import default_timer as timer
+
 
 def int_to_list(item):
     """Helper function to turn int input to list
@@ -34,9 +37,6 @@ def nested_set_to_list(set_):
     return edge_list
 
 
-
-
-
 class BigQueryAgglomerationGraph():
     """Tool to retrieve agglomeration graph information via BigQuery Tables
 
@@ -58,7 +58,6 @@ class BigQueryAgglomerationGraph():
         self.representative_tbl = '.'.join(
             [credentials.project_id, representative_tbl])
         self.src_tbl = '.'.join([credentials.project_id, src_tbl])
-
 
     @staticmethod
     def create_client(svc_acct_file):
@@ -91,22 +90,29 @@ class BigQueryAgglomerationGraph():
             list: A list of chunked queries
         """
         # define
-        MAX_QUERY_LENGTH = 1024 * 1024
+        MAX_QUERY_LENGTH = 1024000
 
         segment_ids = int_to_list(segment_ids)
+        n_segments = len(segment_ids)
         query_str = query.replace('#', ','.join([str(x) for x in segment_ids]))
         if len(query_str) <= MAX_QUERY_LENGTH:
             return [query_str]
 
+        start = timer()
         chunked_queries = []
-        seg_str = ''
-        query_str = ''
         while len(segment_ids) > 0:
+            seg_str = ''
+            query_str = ''
             while len(query_str) <= MAX_QUERY_LENGTH:
-                seg_str = seg_str + str(segment_ids[0]) + ','
-                query_str = query.replace('#', seg_str)
+                seg_str = seg_str + str(int(segment_ids[0])) + ','
+                query_str = query.replace('#', seg_str[:-1])
                 segment_ids.pop(0)
+                if len(segment_ids) == 0:
+                    break
             chunked_queries.append(query_str)
+        stop = timer()
+        print('making query string for', n_segments, 'segments in', len(query_str),
+              'chunks took', timedelta(seconds=stop - start))
 
         return chunked_queries
 
@@ -126,12 +132,18 @@ class BigQueryAgglomerationGraph():
 
         queries = self.chunk_query_str(QUERY, sv_id)
         results = []
-        for query in queries:
+        for i, query in enumerate(queries):
+            start = timer()
             query_job = self.client.query(query)
             rows = query_job.result()
+            stop = timer()
+            print('making query  for', i, 'of', len(queries),
+                  'chunks took', timedelta(seconds=stop - start))
+
             for row in rows:
                 edge = frozenset([row.id1, row.id2])
                 results.append(edge)
+
 
         return results
 
@@ -158,9 +170,13 @@ class BigQueryAgglomerationGraph():
 
         queries = self.chunk_query_str(QUERY, sv_id)
         results = []
-        for query in queries:
+        for i, query in enumerate(queries):
+            start = timer()
             query_job = self.client.query(query)
             rows = query_job.result()
+            stop = timer()
+            print('making query  for', i, 'of', len(queries),
+                  'chunks took', timedelta(seconds=stop - start))
             for row in rows:
                 if return_mapping:
                     results.append(tuple([row.id_a, row.id_b]))
@@ -191,9 +207,13 @@ class BigQueryAgglomerationGraph():
 
         queries = self.chunk_query_str(QUERY, sv_id)
         results = []
-        for query in queries:
+        for i, query in enumerate(queries):
+            start = timer()
             query_job = self.client.query(query)
             rows = query_job.result()
+            stop = timer()
+            print('making query  for', i, 'of', len(queries),
+                  'chunks took', timedelta(seconds=stop - start))
             for row in rows:
                 if return_mapping:
                     results.append(tuple([row.id_a, row.id_b]))
@@ -248,7 +268,7 @@ class BigQueryAgglomerationGraph():
         parents = self.get_map(sv_id)
         unique_parents = list(set(parents))
         results = self.query_supervoxel_members(unique_parents,
-                                                  return_mapping=True)
+                                                return_mapping=True)
         representative_graph = {child: parent for child, parent in results}
 
         mapping = dict()
