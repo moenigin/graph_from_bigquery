@@ -111,7 +111,7 @@ class BigQueryAgglomerationGraph():
                     break
             chunked_queries.append(query_str)
         stop = timer()
-        print('making query string for', n_segments, 'segments in', len(query_str),
+        print('making query string for', n_segments, 'segments in', len(chunked_queries),
               'chunks took', timedelta(seconds=stop - start))
 
         return chunked_queries
