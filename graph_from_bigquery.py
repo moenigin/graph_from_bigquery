@@ -1,6 +1,7 @@
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
+from collections import Counter
 from datetime import timedelta
 from timeit import default_timer as timer
 
@@ -49,15 +50,18 @@ class BigQueryAgglomerationGraph():
         svc_acct_fpath (str or pathlib.Path): Full file path of service account json
         representative_tbl (str): Table name for the representative graph
         src_tbl (str): Table name for the source graph
+        report_time(boolean): flag that decides whether to print query durations
 
     """
 
-    def __init__(self, svc_acct_fpath, representative_tbl, src_tbl):
+    def __init__(self, svc_acct_fpath, representative_tbl, src_tbl,
+                 report_time=False):
         """Initializes BigQueryAgglomerationGraph with input parameters"""
         self.client, credentials = self.create_client(svc_acct_fpath)
         self.representative_tbl = '.'.join(
             [credentials.project_id, representative_tbl])
         self.src_tbl = '.'.join([credentials.project_id, src_tbl])
+        self.report_time = report_time
 
     @staticmethod
     def create_client(svc_acct_file):
@@ -78,8 +82,7 @@ class BigQueryAgglomerationGraph():
                                  project=credentials.project_id, )
         return client, credentials
 
-    @staticmethod
-    def chunk_query_str(query, segment_ids):
+    def chunk_query_str(self, query, segment_ids):
         """Chunks the query string based on segment IDs
 
         Args:
@@ -111,8 +114,10 @@ class BigQueryAgglomerationGraph():
                     break
             chunked_queries.append(query_str)
         stop = timer()
-        print('making query string for', n_segments, 'segments in', len(chunked_queries),
-              'chunks took', timedelta(seconds=stop - start))
+        if self.report_time:
+            print('making query string for', n_segments, 'segments in',
+                  len(chunked_queries), 'chunks took',
+                  timedelta(seconds=stop - start))
 
         return chunked_queries
 
@@ -137,13 +142,13 @@ class BigQueryAgglomerationGraph():
             query_job = self.client.query(query)
             rows = query_job.result()
             stop = timer()
-            print('making query  for', i, 'of', len(queries),
-                  'chunks took', timedelta(seconds=stop - start))
+            if self.report_time:
+                print('making query  for', i, 'of', len(queries),
+                      'chunks took', timedelta(seconds=stop - start))
 
             for row in rows:
-                edge = frozenset([row.id1, row.id2])
+                edge = frozenset([int(row.id1), int(row.id2)])
                 results.append(edge)
-
 
         return results
 
@@ -175,8 +180,9 @@ class BigQueryAgglomerationGraph():
             query_job = self.client.query(query)
             rows = query_job.result()
             stop = timer()
-            print('making query  for', i, 'of', len(queries),
-                  'chunks took', timedelta(seconds=stop - start))
+            if self.report_time:
+                print('making query  for', i, 'of', len(queries),
+                      'chunks took', timedelta(seconds=stop - start))
             for row in rows:
                 if return_mapping:
                     results.append(tuple([row.id_a, row.id_b]))
@@ -212,8 +218,9 @@ class BigQueryAgglomerationGraph():
             query_job = self.client.query(query)
             rows = query_job.result()
             stop = timer()
-            print('making query  for', i, 'of', len(queries),
-                  'chunks took', timedelta(seconds=stop - start))
+            if self.report_time:
+                print('making query  for', i, 'of', len(queries),
+                      'chunks took', timedelta(seconds=stop - start))
             for row in rows:
                 if return_mapping:
                     results.append(tuple([row.id_a, row.id_b]))
@@ -302,7 +309,6 @@ class BigQueryAgglomerationGraph():
             list: list with all edges of segments in sv_id
             (and if verbose=True also returns a dictionary with multiple edges)
         """
-
         def document_multiple_edges(multiple_edges, edge):
             """helper function to count he number of times a given pair of
             segments has crossed threshold for merge decision during
@@ -318,12 +324,13 @@ class BigQueryAgglomerationGraph():
         multiple_edges = dict()
         edge_set = set()
         for e_set in results:
+            if len(e_set) != 2:
+                continue
             if e_set in edge_set:
                 multiple_edges = document_multiple_edges(multiple_edges, e_set)
+            edge_set.add(e_set)
 
-            if len(e_set) == 2:
-                edge_set.add(e_set)
-            edges = nested_set_to_list(edge_set)
+        edges = nested_set_to_list(edge_set)
         if verbose:
             return edges, multiple_edges
         return edges
