@@ -105,10 +105,10 @@ class BigQueryAgglomerationGraph():
             src_tbl (str): Table name for the source graph.
             report_time (boolean): Flag that decides whether to print query durations.
         """
-        self.client, credentials = self.create_client(svc_acct_fpath)
+        self.client, self.credentials = self.create_client(svc_acct_fpath)
         self.representative_tbl = '.'.join(
-            [credentials.project_id, representative_tbl])
-        self.src_tbl = '.'.join([credentials.project_id, src_tbl])
+            [self.credentials.project_id, representative_tbl])
+        self.src_tbl = '.'.join([self.credentials.project_id, src_tbl])
         self.report_time = report_time
         self.MAX_QUERY_LENGTH = 1024000
 
@@ -131,7 +131,6 @@ class BigQueryAgglomerationGraph():
         client = bigquery.Client(credentials=credentials,
                                  project=credentials.project_id, )
         return client, credentials
-
 
     def check_query_length(self, query, segment_ids):
         """Checks whether query exceeds Google's maximum query length.
@@ -249,7 +248,6 @@ class BigQueryAgglomerationGraph():
                 edge = frozenset([int(row.id1), int(row.id2)])
                 results.append(edge)
         return results
-
 
     def query_supervoxel_members(self, sv_id, return_mapping=False):
         """Retrieves the base segments agglomerated to the supervoxel(s) sv_id
