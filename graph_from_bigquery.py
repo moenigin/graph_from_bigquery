@@ -19,7 +19,7 @@ def int_to_list(item):
     if isinstance(item, int):
         return [item]
     elif isinstance(item, list):
-        return item
+        return item.copy()
     else:
         raise ValueError("input needs to be integer or list, not", type(item))
 
@@ -145,18 +145,17 @@ class BigQueryAgglomerationGraph():
         else:
             return None
 
-    def chunk_query_str(self, query, segment_ids):
+    def chunk_query_str(self, query, segments):
         """Chunks the query string based on segment IDs
 
         Args:
             query (str): Query string
-            segment_ids (int or list): Segment IDs
+            segments (int or list): Segment IDs
 
         Returns:
             list: A list of chunked queries
         """
-        # define
-        segment_ids = int_to_list(segment_ids)
+        segment_ids = int_to_list(segments)
         n_segments = len(segment_ids)
 
         query_str = self.check_query_length(query, segment_ids)
