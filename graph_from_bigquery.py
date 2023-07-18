@@ -112,7 +112,6 @@ class BigQueryAgglomerationGraph():
         self.report_time = report_time
         self.MAX_QUERY_LENGTH = 1024000
 
-
     @staticmethod
     def create_client(svc_acct_file):
         """Creates a bigquery.Client from a service account json file
